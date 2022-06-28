@@ -1,4 +1,6 @@
 import os
+import subprocess
+from time import time
 from tkinter.filedialog import askopenfilename
 from tkinter import Tk
 import shutil
@@ -51,11 +53,11 @@ class centerObject():
 
         for contour in contours:
             
-            if cv2.contourArea(contour) > 16000:
+            if cv2.contourArea(contour) > 3000:
 
                 (x,y,w,h)=cv2.boundingRect(contour)
 
-                if (x+w)-(y+h) > 400:
+                if (x+w)-(y+h) > 200:
                     self.motion_frame = self.frame1[y:y+h+100,x:x+w+200]
 
                     if draw:
@@ -71,7 +73,7 @@ class centerObject():
         return f
 
     def detect_human(self,frame,draw=False):
-        with self.faceDetector.FaceDetection(min_detection_confidence=0.5) as face_detection:
+        with self.faceDetector.FaceDetection(min_detection_confidence=0.1) as face_detection:
             
             # Convert the BGR image to RGB.
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -174,7 +176,7 @@ class centerObject():
 
         fps = self.old_fps/2
 
-        video = cv2.VideoWriter('testvideo.avi',cv2.VideoWriter_fourcc('X','V','I','D'),fps, (int(self.width), int(self.height)))
+        video = cv2.VideoWriter('testvideo.avi',cv2.VideoWriter_fourcc(*'mp4v'),fps, (int(self.width), int(self.height)))
         
         while self.vid.isOpened():
             _, self.frame1 = self.vid.read()
@@ -188,7 +190,7 @@ class centerObject():
             detect_motion = self.motion_detection(f1,f2)
 
             if detect_motion:
-                if self.detect_human(self.motion_frame) and self.end_x != 0 and self.start_x != 0:
+                if self.detect_human(self.frame1) and self.end_x != 0 and self.start_x != 0:
 
                     mid = (self.start_x+self.end_x)/2
                     
@@ -205,7 +207,7 @@ class centerObject():
                         crop_x2 = 0
                         crop_y2 = int(self.width-final_pt)
 
-                    print(self.position)
+                    print('Putting black screen on '+self.position)
 
                     
             self.frame1 = self.frame1[crop_x1:crop_y1,crop_x2:crop_y2]
@@ -213,9 +215,9 @@ class centerObject():
 
             video.write(self.frame1)
             
-            cv2.imshow('Test',self.frame1)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+            # cv2.imshow('Test',self.frame1)
+            # if cv2.waitKey(1) & 0xFF == ord('q'):
+            #     break
         
         self.vid.release()
         video.release()
@@ -230,23 +232,23 @@ class centerObject():
         my_clip.audio.write_audiofile("temp_audio.mp3")
         return True
 
-    def combine_audio(self,vidname):
+    def combine_audio(self,path):
+
+        print('---------------Combining video and audio please wait---------------')
         
-        fps = self.old_fps/2
-        audname = 'temp_audio.mp3'
-        my_clip = mvp.VideoFileClip(vidname)
-        audio_background = mvp.AudioFileClip(audname)
-        final_clip = my_clip.set_audio(audio_background)
-        final_clip.write_videofile(vidname,fps=fps)
+        cmd = 'ffmpeg -i testvideo.avi -i temp_audio.mp3 -c:v copy -c:a aac '+path
+        subprocess.call(cmd, shell=True)
 
     def run(self,path):
-        try:
-            self.process_video()
-        except:
-            pass
+        
+
+        stime = time()
+        
+        self.process_video()
+        
         
         if self.extract_audio(path):
-            self.combine_audio('testvideo.avi')
+            self.combine_audio(path)
         else:
             shutil.copy('testvideo.avi',path)
 
@@ -257,6 +259,8 @@ class centerObject():
             pass
 
         print('----------------Final video completed------------')
+        etime = time()
+        print('Time taken to complete (in seconds) '+etime-stime)
 
 if __name__ == '__main__':
     root = Tk()
